@@ -2,36 +2,39 @@ package in.reqres;
 
 import data.People;
 import data.PeopleCreated;
+import data.UserData;
+import data.UsersFromPage;
 import io.restassured.path.json.JsonPath;
 import io.restassured.response.Response;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import static in.reqres.Specification.*;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
 public class APITests {
-
     /**
      * Запрос и проверка данныйх через Rest-Assured
      */
     @Test(testName = "Запрос и проверка данных")
     public void checkFieldsNotNull() {
         given()
+                .spec(reqSpec())
                 .when()
-                .get("https://reqres.in/api/users?page=2")
+                .get("/users?page=2")
                 .then()
-                .log().all()
                 .body("page", notNullValue())
                 .body("per_page", notNullValue())
                 .body("total", notNullValue())
                 .body("total_pages", notNullValue())
-                .body("data.id",not(hasItem(nullValue())))
-                .body("data.first_name", hasItem("Lindsay"));
-
+                .body("data.id", not(hasItem(nullValue())))
+                .body("data.first_name", hasItem("Lindsay"))
+                .spec(respSpec());
     }
 
     /**
@@ -40,18 +43,18 @@ public class APITests {
     @Test(testName = "Создание нового пользователя")
     public void createNewUser() {
 
-        Map<String,String> requestData = new HashMap<>();
+        Map<String, String> requestData = new HashMap<>();
         requestData.put("name", "Kirill");
         requestData.put("job", "Teacher");
 
         Response response = given()
+                .spec(reqSpec())
                 .when()
-                .contentType("application/json")
                 .body(requestData)
                 .when()
-                .post("https://reqres.in/api/users")
+                .post("/users")
                 .then()
-                .log().all()
+                .spec(respCreateUser())
                 .extract()
                 .response();
         JsonPath jsonResponse = response.jsonPath();
@@ -66,17 +69,45 @@ public class APITests {
     public void createNewUserWithDTO() {
         People people = new People("Kirill", "Teacher");
         PeopleCreated peopleCreated = given()
+                .spec(reqSpec())
                 .when()
-                .contentType("application/json")
                 .body(people)
                 .when()
-                .post("https://reqres.in/api/users")
+                .post("/users")
                 .then()
-                .log().all()
-                .extract()
-                .as(PeopleCreated.class);
+                .spec(respCreateUser())
+                .extract().as(PeopleCreated.class);
         Assert.assertEquals(peopleCreated.getName(), people.getName(), "Name is not valid");
         Assert.assertEquals(peopleCreated.getJob(), people.getJob(), "Job is not valid");
+    }
 
+    /**
+     * Запрос и проверка данных(DTO)
+     */
+    @Test(testName = "Запрос и проверка данных(DTO)")
+    public void setFieldsWithDTO() {
+        UsersFromPage usersFromPage = given()
+                .spec(reqSpec())
+                .when()
+                .get("/users?page=2")
+                .then()
+                .spec(respSpec())
+                .extract().as(UsersFromPage.class);
+        System.out.println(usersFromPage.getSupport().getUrl());
+    }
+
+    /**
+     * Получение пользователей из всех данных данных(DTO)
+     */
+    @Test(testName = "Получение пользователей из данных")
+    public void setUsersFromAllData() {
+        List<UserData> userDataList = given()
+                .spec(reqSpec())
+                .when()
+                .get("/users?page=2")
+                .then()
+                .spec(respSpec())
+                .extract().body().jsonPath().getList("data", UserData.class);
+        userDataList.stream().forEach(i -> System.out.println(i.getFirst_name()));
     }
 }
